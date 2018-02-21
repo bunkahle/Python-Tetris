@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 # -*- coding: utf-8 -*-
-# minimal tetris.py for under 180 lines of python code (if you delete all the comments and credits)
+# minimal_tetris.py for under 160 lines of python code (if you delete all the comments and credits)
 # just with the built-in python libraries - batteries included
 # it has been optimized to run also on very old platforms so more code is included than necessary like the print alias
 # this version runs in the pure console window (tested with Windows) you won´t get it to work with Sublime Text
@@ -74,8 +74,7 @@ def print_at(r, c, s):
     else:
         print(s)
 
-def show_feld():
-    global COLS, ROWS, FELD
+def show_feld(COLS, ROWS, FELD):
     sfeld = "+" + COLS*"-" + "+\n"
     for i in range(ROWS):
         sfeld += '|' + FELD[i][1:-1] + "|\n"
@@ -92,8 +91,7 @@ def clearScreen():
         except:
             pass
 
-def chkBoard(score): # kill full lines and increase score
-    global FELD, ROWS, COLS
+def chkBoard(FELD, ROWS, COLS, score): # kill full lines and increase score
     deleted = True
     while deleted:
         deleted = False
@@ -106,98 +104,78 @@ def chkBoard(score): # kill full lines and increase score
                 break
     return score
 
-def testCollision(FP):
+def testCollision(FELD, FP):
     "routine for testing collision"
-    global FELD
     for i in range(3):
         for j in range(3):
-            if FP[3][i][j] == "X" and FELD[FP[0]+i][FP[1]+j] == "X":
-                return 0 # collision 
-    return 2
+            if FP[2][i][j] == "X" and FELD[FP[0]+i][FP[1]+j] == "X":
+                return 1 # collision 
+    return 0 # no collision
 
 def putFig(FP, mode):
-    'routine for deleting mode=="." or drawing mode=="X" the brick as FP = x,y,rotation,figure'
-    global FELD
-    # put the brick into FELD as "." or "X"
-    if (ROWS-FP[0]>=3):
-        maxind_i = 3
-    else: 
-        maxind_i = (ROWS-FP[0])
-    for i in range(maxind_i):
+    'routine for deleting mode=="." or drawing mode=="X" the brick as FP = x,y,figure'
+    for i in range(3):
         for j in range(3):
-            if FP[3][i][j] == "X" and mode == ".":
-                FELD[FP[0]+i] = FELD[FP[0]+i][:FP[1]+j] + "." + FELD[FP[0]+i][FP[1]+j+1:] # deleting old brick
-            elif FP[3][i][j] == "X": # mode == "X"
-                FELD[FP[0]+i] = FELD[FP[0]+i][:FP[1]+j] + "X" + FELD[FP[0]+i][FP[1]+j+1:]  # drawing new brick
+            if FP[2][i][j] == "X": # mode == "X"
+                FELD[FP[0]+i] = FELD[FP[0]+i][:FP[1]+j] + mode + FELD[FP[0]+i][FP[1]+j+1:]  # drawing new brick
 
-def MoveFig(FP, key, d):
+def MoveFig(FELD, FP, key, d):
     "figure moving continuous downward function"
-    global FELD, FigPos
+    def return_success(F, success):
+        putFig(F, "X")
+        return success, F # movement with success=1 or without success=0
     FPC = deepcopy(FP)
-    if key == ckeys["left"]:
-        if FPC[1]-d>=0 and FPC[3] == tetrominoes[3]: # Nr. 3 of tetrominoes [['.','X','.'], ['.','X','.'], ['.','X','.']] 
-            FPC[1] = FPC[1] - d
-        elif FPC[1]-d>=1:
-            FPC[1] = FPC[1] - d
-        elif FPC[0]+d<=ROWS+1:
-            FPC[0] = FPC[0] + d
-    elif key == ckeys["right"]:
-        if FPC[1]+d<=COLS-1 and FPC[3] == tetrominoes[3]: # Nr. 3 of tetrominoes [['.','X','.'], ['.','X','.'], ['.','X','.']] 
-            FPC[1] = FPC[1] + d
-        elif FPC[1]+d<=COLS-2:
-            FPC[1] = FPC[1] + d
-        elif FPC[0]+d<=ROWS+1:
-            FPC[0] = FPC[0] + d
-    elif key == ckeys["down"]:
-        if FPC[0]+d*2<=ROWS+1:
-            d = 2
-        else:
-            d = 1
-        FPC[0] = FPC[0] + d
-    elif key == ckeys["up"]: 
-        FPC[3] = RotFig(FPC[3], 3)
+    if key == ckeys["left"]: FPC[1] = FPC[1] - d
+    elif key == ckeys["right"]: FPC[1] = FPC[1] + d
+    elif key == ckeys["down"]: FPC[0] = FPC[0] + d*2
+    elif key == ckeys["up"]: FPC[2] = RotFig(FPC[2], 3)
     elif key == ckeys["drop"]: 
         d = FPC[0]
         putFig(FP, ".")
         FPC[0] = FPC[0] + 1
-        while testCollision(FPC) == 2: # no collision
+        while not testCollision(FELD, FPC): # no collision
             FPC[0] = FPC[0] + 1
         if d != FPC[0]:
             FPC[0] = FPC[0] -1
-            putFig(FPC, "X")
-            FigPos = deepcopy(FPC)
-            return 1
+            return return_success(FPC, 1)
         else:
-            putFig(FP,"X")
-            return 0
+            return return_success(FP, 0)
     elif FPC[0]+d<=ROWS+1:
         FPC[0] = FPC[0] + d
     putFig(FP, ".")
-    if testCollision(FPC) == 2: # no collision
-        # delete old brick and draw new brick
-        putFig(FPC, "X")
-        FigPos = deepcopy(FPC)
-        return 1
+    if not testCollision(FELD, FPC): # no collision
+        return return_success(FPC, 1)
     else:
-        # collision no change
-        putFig(FP, "X")
-        return 0
+        if key == ckeys["left"]:
+            FPC[1] = FPC[1] + d
+            FPC[0] = FPC[0] + d
+        elif key == ckeys["right"]:
+            FPC[1] = FPC[1] - d
+            FPC[0] = FPC[0] + d
+        elif key == ckeys["down"]:
+            FPC[0] = FPC[0] - d
+        elif key == ckeys["up"]: 
+            FPC[2] = deepcopy(FP[2])
+            FPC[0] = FPC[0] + d
+        if not testCollision(FELD, FPC): # no collision
+            return return_success(FPC, 1)
+        else:    
+            return return_success(FP, 0)
 
-def RotFig(FP, rot): # rot = 0 no rotation, 
+def RotFig(FPR, rot):
     "Rotation routine according to rot = 1 rotation 90 to the right, rot = 2 = rotation 180 degrees, rot = 3 = rotation 270 to the right"
-    FPR = deepcopy(FP)
     for r in range(rot%4):
         FPR = list(list(x)[::-1] for x in zip(*FPR))
     return FPR
 
-def showfield(counter, msg):
+def showfield(COLS, ROWS, FELD, counter, msg):
     "show the field of bricks and the score"
     key = ""
     if unixterminal:
         clearScreen()
     print_at(0, 0, msg)
     print_at(4, 0, "\n"+str(counter)+' Score: '+str(score+counter)+' ')
-    show_feld()
+    show_feld(COLS, ROWS, FELD)
     t0 = time.time()
     key = -1
     pause = False
@@ -267,25 +245,25 @@ a = raw_input("Are you ready for this Pythonic game of tetris -\ncode with all b
 if a == "n" or a == "N" or a == "I am afraid": sys.exit()
 clearScreen()
 score = 0
-FigPos = [0, int(COLS/2)-1, 0, tetrominoes[randrange(0,lt,1)]] # x,y,rotation,figure
+FigPos = [0, int(COLS/2)-1, tetrominoes[randrange(0,lt,1)]] # x,y,figure
 counter = 0
 new_tetrom = tetrominoes[randrange(0,lt,1)]
 new_brick = "\n".join([b[0]+b[1]+b[2] for b in new_tetrom])
-if testCollision(FigPos) != 0:
+if not testCollision(FELD, FigPos):
     putFig(FigPos, "X")
     while True: # main loop
         counter += 1
         msg = "Next Brick:\n" + new_brick
-        key = showfield(counter, msg)
+        key = showfield(COLS, ROWS, FELD, counter, msg)
         if key == ckeys["esc"] or key == ckeys["quit"]: break
-        ret = MoveFig(FigPos, key, 1)
-        if not ret:
-            score = chkBoard(score) # check for complete rows and delete them
-            FigPos = [0, int(COLS/2)-1, 0, new_tetrom] # create new tetrominoe with x,y,rotation,figure
-            new_tetrom = tetrominoes[randrange(0,lt,1)]
+        move, FigPos = MoveFig(FELD, FigPos, key, 1)
+        if not move:
+            score = chkBoard(FELD, ROWS, COLS, score) # check for complete rows and delete them
+            FigPos = [0, int(COLS/2)-1, new_tetrom] # create new tetrominoe with x,y,rotation,figure
+            new_tetrom = tetrominoes[randrange(0,lt,1)] # create next brick for already showing it
             new_brick = "\n".join([b[0]+b[1]+b[2] for b in new_tetrom])
-            if testCollision(FigPos) == 0: break
+            if testCollision(FELD, FigPos): break
             putFig(FigPos, "X")
 else:
-    key = showfield(counter, "Game size too small")
+    key = showfield(COLS, ROWS, FELD, counter, "Game size too small")
 print("Game over. Your score is: "+str(score+counter))
